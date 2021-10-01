@@ -20,7 +20,7 @@ namespace gamingCloud.Network.tcp
         #region Listeners
         public event Action<string> OnPacketRecieve;
         public event Action OnConnected;
-        ulong packetSize = 1024 * 1024 * 100;
+        ulong packetSize = 1024;
         #endregion
 
 
@@ -52,46 +52,39 @@ namespace gamingCloud.Network.tcp
         }
 
 
-        private void ListeningOnServerMessages()
+        private async void ListeningOnServerMessages()
         {
+            var stream = socketConnection.GetStream();
+            int i;
+            byte[] bytes = new byte[] { };
+            string recvData = String.Empty;
             try
             {
-
-                socketConnection = new TcpClient();
-                socketConnection.Connect(address, port);
-                Byte[] bytes = new Byte[packetSize];
-                while (true)
+                Console.WriteLine("New Client.");
+                while ((i = await stream.ReadAsync(bytes, 0, bytes.Length)) != 0)
                 {
-
-                    if (!socketConnection.Client.Connected)
-                        continue;
-                    else if (!isConnected)
+                    string currentParse = Encoding.UTF8.GetString(bytes, 0, i);
+                    if (currentParse.Contains("<EOF>"))
                     {
-                        isConnected = true;
-                        if (OnConnected != null)
-                            OnConnected();
-                    }
+                        string[] split = currentParse.Split(new string[]{ "<EOF>" }, StringSplitOptions.None);
+                        recvData += split[0];
 
-                    // Get a stream object for reading 				
-                    using (NetworkStream stream = socketConnection.GetStream())
-                    {
-                        int length;
-                        while ((length = stream.Read(bytes, 0, bytes.Length)) != 0)
-                        {
-                            var incommingData = new byte[length];
-                            Array.Copy(bytes, 0, incommingData, 0, length);
+                        // packet is ok
+                        OnPacketRecieve(recvData);
 
-                            // Convert byte array to string message. 						
-                            string serverMessage = Encoding.ASCII.GetString(incommingData);
-                            if (OnPacketRecieve != null)
-                                OnPacketRecieve(serverMessage);
-                        }
+                        if (split.Length > 1 && split[1].Trim().Length > 0)
+                            recvData = split[1];
+                        else
+                            recvData = String.Empty;
                     }
+                    else recvData += currentParse;
                 }
+
             }
-            catch (SocketException socketException)
+            catch
             {
-                Debug.Log("Socket exception: " + socketException);
+                // Client Disconnected
+                socketConnection.Close();
             }
         }
 
@@ -103,6 +96,9 @@ namespace gamingCloud.Network.tcp
 
             try
             {
+
+                message = message + "<EOF>";
+
                 // Get a stream object for writing. 			
                 NetworkStream stream = socketConnection.GetStream();
                 if (stream.CanWrite)

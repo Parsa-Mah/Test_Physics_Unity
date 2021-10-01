@@ -15,12 +15,11 @@ public class Connection : MonoBehaviour
         tcp.OnPacketRecieve += Tcp_OnPacketRecieve;
     }
 
-    private void Tcp_OnPacketRecieve(string obj)
+    private void Tcp_OnPacketRecieve(string recvPacket)
     {
         UnityMainThreadDispatcher.Instance().Enqueue(() =>
         {
-            tcp.sendPacket();
-
+            print(recvPacket);
         });
     }
 
